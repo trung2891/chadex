@@ -515,6 +515,7 @@ contract Chadex is ChadexBase, ReentrancyGuard {
                         uint baseTokens;
                         if (Tokens.unwrap(tradeInput.baseTokens) > quoteTokensInBaseTokens) {
                             baseTokens = quoteTokensInBaseTokens;
+                            // TODO: Delete entry and move head : Trung Note
                         } else {
                             baseTokens = Tokens.unwrap(tradeInput.baseTokens);
                             quoteTokens = baseToQuote(moreInfo.decimalss, baseTokens, bestMatchingPrice);
