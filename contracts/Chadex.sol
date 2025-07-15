@@ -149,7 +149,7 @@ contract ChadexBase {
     mapping(PairKey => Pair) pairs;
     mapping(PairKey => mapping(BuySell => BokkyPooBahsRedBlackTreeLibrary.Tree)) priceTrees;
     mapping(PairKey => mapping(BuySell => mapping(Price => OrderQueue))) orderQueues;
-    mapping(OrderKey => Order) orders;
+    mapping(OrderKey => Order)  orders;
 
     mapping(Account => AccountIndex) accountToIndex; // Note that we will use index + 1 for array below
     Account[] indexToAccount;
@@ -617,11 +617,13 @@ contract Chadex is ChadexBase, ReentrancyGuard {
             while (isNotSentinel(bestMatchingOrderKey)) {
                 Order storage order = orders[bestMatchingOrderKey];
                 HandleOrderResults memory results = _handleOrder(tradeInput, moreInfo, bestMatchingPrice, bestMatchingOrderKey, order);
+               
                 order.tokens = Tokens.wrap(uint128(Tokens.unwrap(order.tokens) - uint128(results.tokensToTransfer)));
                 filled = Tokens.wrap(uint128(Tokens.unwrap(filled) + uint128(results.tokensToTransfer)));
                 quoteFilled = Tokens.wrap(uint128(Tokens.unwrap(quoteFilled) + uint128(results.quoteTokensToTransfer)));
                 tradeInput.baseTokens = Tokens.wrap(uint128(Tokens.unwrap(tradeInput.baseTokens) - uint128(results.tokensToTransfer)));
                 if (results.deleteOrder) {
+                   
                     OrderKey temp = bestMatchingOrderKey;
                     bestMatchingOrderKey = order.next;
                     orderQueue.head = order.next;
@@ -636,6 +638,7 @@ contract Chadex is ChadexBase, ReentrancyGuard {
                     break;
                 }
             }
+
             if (isSentinel(orderQueue.head)) {
                 delete orderQueues[moreInfo.pairKey][moreInfo.inverseBuySell][bestMatchingPrice];
                 Price tempBestMatchingPrice = getMatchingNextBestPrice(moreInfo, bestMatchingPrice);
@@ -765,6 +768,19 @@ contract Chadex is ChadexBase, ReentrancyGuard {
             _checkTakerAvailableTokens(tradeInput, moreInfo);
         }
         order.expiry = tradeInput.expiry;
+        // update the order in the orders
+        orders[orderKey] = order;
+
+        // update the order in the offers
+        Offer[] storage queue = offers[moreInfo.pairKey][tradeInput.buySell][tradeInput.price].queue;
+        for (uint i; i < queue.length; i++) {
+            if (AccountIndex.unwrap(queue[i].maker) == AccountIndex.unwrap(accountToIndex[moreInfo.taker])) {
+                queue[i].expiry = tradeInput.expiry;
+                queue[i].tokens = tradeInput.baseTokens;
+                break;
+            }
+        }
+
         emit OrderUpdated(moreInfo.pairKey, orderKey, moreInfo.taker, tradeInput.buySell, tradeInput.price, tradeInput.expiry, order.tokens, Unixtime.wrap(uint40(block.timestamp)));
     }
 
